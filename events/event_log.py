@@ -1,6 +1,6 @@
 import logging
 
-from agent_config import EVENTS_PATH
+from agent_config import EVENTS_PATH, update_session_metadata
 
 from .base import Event
 
@@ -17,11 +17,13 @@ class EventLog:
         self.handlers.append(handler)
 
     # def append(self, type, payload, tool)
-    def append(self, event: Event):
+    def append(self, event: Event, project_dir, session_id):
         line = event.model_dump_json() + "\n"
         with open(self.path,'a') as file:
             file.write(line)
         self.events.append(event)
+
+        update_session_metadata(project_dir, session_id)
 
         #have the handler handle the new event
         for handler in self.handlers:

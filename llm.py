@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from openai import OpenAI
 
+from agent_config import DATA_DIR, SESSION_ID
 from events.event_log import EventLog
 from events.types import ActionEvent, MessageEvent, ObservationEvent
 from tools import EDIT_TOOL, LIST_TOOL, READ_TOOL, SHELL_TOOL, WRITE_TOOL
@@ -36,7 +37,7 @@ def call_llm(client:OpenAI ,messages : list, available_functions : list, event_l
                 content= msg.content or "",
                 source = "agent",
                 type= "message"
-            ))
+            ), project_dir=DATA_DIR, session_id=SESSION_ID)
 
         if not msg.tool_calls:
             return msg.content or ""
@@ -61,7 +62,7 @@ def call_llm(client:OpenAI ,messages : list, available_functions : list, event_l
                 tool_name= tool_call.function.name,
                 tool_call_id= tool_call.id,
                 arguments= args
-            ))
+            ), project_dir=DATA_DIR, session_id=SESSION_ID)
 
             try:
                 fn = available_functions[name]
@@ -85,6 +86,6 @@ def call_llm(client:OpenAI ,messages : list, available_functions : list, event_l
                 tool_call_id= tool_call.id,
                 tool_name=tool_call.function.name,
                 content= result
-            ))
+            ), project_dir=DATA_DIR, session_id=SESSION_ID)
             messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
     raise RuntimeError(f"Agent hit {MAX_STEPS}-iteration limit")

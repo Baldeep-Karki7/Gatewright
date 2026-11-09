@@ -7,7 +7,7 @@ import openai
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from agent_config import EVENTS_PATH, LOG_PATH, SYSTEM
+from agent_config import DATA_DIR, EVENTS_PATH, LOG_PATH, SESSION_ID, SYSTEM
 from events.display import ConsoleDisplay
 from events.event_log import EventLog
 from events.replay import load_events, rebuild_messages
@@ -122,7 +122,7 @@ if __name__ == "__main__":
         except (EOFError, KeyboardInterrupt):
             break
 
-        user_event = event_log.append(MessageEvent(source="user", content=user_input))
+        user_event = event_log.append(MessageEvent(source="user", content=user_input), project_dir=DATA_DIR, session_id=SESSION_ID)
         checkpoint = len(messages)
         messages.append({"role": "user", "content": user_input})
 
