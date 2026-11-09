@@ -16,3 +16,8 @@ ENV/
 history.json
 agent.log
 *.env
+events.jsonl
+
+*.txt
+# agent files
+.agent/
