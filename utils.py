@@ -1,9 +1,8 @@
-import json
 import logging
 import os
 import subprocess
 
-from agent_config import GIT_IGNORE_CONTENT, HISTORY, ROOT, SYSTEM
+from agent_config import ROOT
 
 logger = logging.getLogger(__name__)
 
@@ -67,28 +66,28 @@ def run_shell(command):
     return f"exit={r.returncode}\nstdout:\n{r.stdout[:5000]}\nstderr:\n{r.stderr[:5000]}"
 
 
-def save_history(messages):
-    try:
-        with open(safe_path(HISTORY), 'w') as fp:
-            json.dump(messages, fp)
-            print(f'HISTORY saved... to {HISTORY}')
-    except Exception as e:
-        logger.exception("Exception in opening history.json file")
-        print(e)
+# def save_history(messages):
+#     try:
+#         with open(safe_path(HISTORY), 'w') as fp:
+#             json.dump(messages, fp)
+#             print(f'HISTORY saved... to {HISTORY}')
+#     except Exception as e:
+#         logger.exception("Exception in opening history.json file")
+#         print(e)
 
-def load_history():
-    if os.path.exists(safe_path(HISTORY)):
-        try:
-            with open(safe_path(HISTORY), 'r', encoding='utf-8') as file:
-                history = json.load(file)
-                if history:
-                    print(f'HISTORY LOADED.... from {HISTORY}\n')
-                    return history
-        except json.JSONDecodeError:
-            #using logger.exception here causes traceback into the log but it is not needed
-            logger.info('%s file decoding fail', HISTORY)
+# def load_history():
+#     if os.path.exists(safe_path(HISTORY)):
+#         try:
+#             with open(safe_path(HISTORY), 'r', encoding='utf-8') as file:
+#                 history = json.load(file)
+#                 if history:
+#                     print(f'HISTORY LOADED.... from {HISTORY}\n')
+#                     return history
+#         except json.JSONDecodeError:
+#             #using logger.exception here causes traceback into the log but it is not needed
+#             logger.info('%s file decoding fail', HISTORY)
 
-    return [{"role" : "system", "content" : SYSTEM}] 
+#     return [{"role" : "system", "content" : SYSTEM}] 
 
 
 def trim_messages(messages, max_messages = 10):
@@ -105,26 +104,60 @@ def trim_messages(messages, max_messages = 10):
             return [messages[0]] + new_messages[i:]
     return new_messages
 
+
+AGENT_FILES = ["agent.log", "events.jsonl", "history.json", ".agent/"]
+
+def hide_agent_files(root):
+    """Make sure .gitignore lists the agent's own files, creating the file if needed.
+
+    Returns True if it added anything.
+    """
+    path = os.path.join(root, ".gitignore")
+    text = ""
+    if os.path.exists(path):
+        with open(path) as f:
+            text = f.read()
+
+    listed = {line.strip().lstrip("/") for line in text.splitlines()}
+    missing = [name for name in AGENT_FILES if name not in listed]
+    if not missing:
+        return False
+
+    with open(path, "a") as f:
+        if text and not text.endswith("\n"):
+            f.write("\n")                  # don't glue onto the last existing line
+        f.write("# agent files\n" + "\n".join(missing) + "\n")
+    return True
+
+
 def initialize_git():
-    """Ensure ROOT is its own git repo. Returns True if usable, False otherwise."""
+    """Make sure ROOT is its own git repo and hides the agent's files.
+
+    Returns True if git is usable, False otherwise.
+    """
     try:
+        # Is ROOT itself the top of a repo? (A parent folder's repo doesn't count.)
         r = subprocess.run(["git", "rev-parse", "--show-toplevel"],
                            capture_output=True, text=True, cwd=ROOT, check=False)
-        if r.returncode == 0 and os.path.realpath(r.stdout.strip()) == ROOT:
-            return True
-        subprocess.run(["git", "init"], check=True, capture_output=True,
-                       text=True, cwd=ROOT)
+        own_repo = r.returncode == 0 and os.path.realpath(r.stdout.strip()) == ROOT
 
-        with open(os.path.join(ROOT,'.gitignore'),'w') as file:
-            file.write(GIT_IGNORE_CONTENT)
-            logger.info('.gitignore created')
-            
+        if not own_repo:
+            subprocess.run(["git", "init"], check=True, capture_output=True,
+                           text=True, cwd=ROOT)
+
+        # If the ignore rules changed, drop the snapshot index so it is rebuilt with them.
+        if hide_agent_files(ROOT):
+            index = os.path.join(ROOT, ".git", "agent-index")
+            if os.path.exists(index):
+                os.remove(index)
+
         return True
+
     except FileNotFoundError:
         logger.error("git is not installed; change reports disabled")
         return False
-    except subprocess.CalledProcessError as e:
-        logger.error("git init failed: %s", e.stderr)
+    except (subprocess.CalledProcessError, OSError) as e:
+        logger.error("git setup failed: %s", e)
         return False
 
 def snapshot():
