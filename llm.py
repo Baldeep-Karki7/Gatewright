@@ -1,8 +1,11 @@
 import json
 import logging
+from uuid import uuid4
 
 from openai import OpenAI
 
+from events.event_log import EventLog
+from events.types import ActionEvent, MessageEvent, ObservationEvent
 from tools import EDIT_TOOL, LIST_TOOL, READ_TOOL, SHELL_TOOL, WRITE_TOOL
 
 #module level logger
@@ -10,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 MAX_STEPS = 20
 
-def call_llm(client:OpenAI ,messages : list, available_functions : list) -> str:
+def call_llm(client:OpenAI ,messages : list, available_functions : list, event_log : EventLog) -> str:
 
-    for _ in range(20):
+    for _ in range(MAX_STEPS):
         response = client.chat.completions.create(
                 model="gemma4:31b",
                 messages=messages,
@@ -24,26 +27,64 @@ def call_llm(client:OpenAI ,messages : list, available_functions : list) -> str:
     
             
         msg = response.choices[0].message
+        response_id = uuid4().hex
+
+        #The agents text that wants to call the tools
+        if msg.content or not msg.tool_calls:
+            event_log.append(MessageEvent(
+                response_id= response_id,
+                content= msg.content or "",
+                source = "agent",
+                type= "message"
+            ))
+
         if not msg.tool_calls:
             return msg.content or ""
 
         messages.append(msg.model_dump(exclude_none = True))  # assistant message containing tool_calls
 
+
         # breakpoint()
         for tool_call in msg.tool_calls:
-            print(f"Calling tool: {tool_call.function.name}")
+
+            name = tool_call.function.name
             try:
-                fn = available_functions[tool_call.function.name]
-                result = str(fn(**json.loads(tool_call.function.arguments)))
+                args = json.loads(tool_call.function.arguments)
+            except json.JSONDecodeError:
+                args = {}
 
-                ok = not result.startswith("error")
-                if tool_call.function.name == "run_shell":
-                    ok = ok and result.startswith("exit=0")
+             #log the ActionEvent to the event_log BEFORE the tool runs
+            action_event = event_log.append(ActionEvent(
+                source = "agent",
+                type= "action",
+                response_id=response_id,
+                tool_name= tool_call.function.name,
+                tool_call_id= tool_call.id,
+                arguments= args
+            ))
 
-                #log the tool call as info if success
-                logger.info("TOOL = %s args = %s ok = %s result = %s",tool_call.function.name, tool_call.function.arguments, ok, result[:300])
+            try:
+                fn = available_functions[name]
+                result = str(fn(**args))
+
             except Exception as e:
                 logger.exception("TOOL %s failed", tool_call.function.name)
                 result = f"error: {type(e).__name__}: {e}"   # model sees it and can adapt
+
+            ok = not result.startswith("error")
+            if name == "run_shell":
+                ok = ok and result.startswith("exit=0")
+            logger.info("TOOL = %s args = %s ok = %s result = %s",
+                        name, args, ok, result[:300])
+
+            #Append the Result AFTER the tool call even if the tool call failed
+            event_log.append(ObservationEvent(
+                source= "environment",
+                type="observation",
+                action_id=action_event.id,
+                tool_call_id= tool_call.id,
+                tool_name=tool_call.function.name,
+                content= result
+            ))
             messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
-    raise RuntimeError("Agent hit 20-iteration limit")
+    raise RuntimeError(f"Agent hit {MAX_STEPS}-iteration limit")
