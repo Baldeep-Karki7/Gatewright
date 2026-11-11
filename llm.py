@@ -1,11 +1,10 @@
 import json
 import logging
-import os
 from uuid import uuid4
 
 from openai import OpenAI
 
-from agent_config import DATA_DIR, SESSION_ID
+from agent_config import DATA_DIR
 from events.event_log import EventLog
 from events.types import ActionEvent, MessageEvent, ObservationEvent
 from tools import EDIT_TOOL, LIST_TOOL, READ_TOOL, SHELL_TOOL, WRITE_TOOL
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 MAX_STEPS = 20
 MODEL_NAME = "openai/gpt-oss-20b"
 
-def call_llm(client:OpenAI ,messages : list, available_functions : list, event_log : EventLog) -> str:
+def call_llm(client:OpenAI ,messages : list, available_functions : list, event_log : EventLog, session_id) -> str:
 
     for _ in range(MAX_STEPS):
         response = client.chat.completions.create(
@@ -39,7 +38,7 @@ def call_llm(client:OpenAI ,messages : list, available_functions : list, event_l
                 content= msg.content or "",
                 source = "agent",
                 type= "message"
-            ), project_dir=DATA_DIR, session_id=SESSION_ID)
+            ), project_dir=DATA_DIR, session_id=session_id)
 
         if not msg.tool_calls:
             return msg.content or ""
@@ -53,9 +52,13 @@ def call_llm(client:OpenAI ,messages : list, available_functions : list, event_l
             name = tool_call.function.name
             try:
                 args = json.loads(tool_call.function.arguments)
+                
             except json.JSONDecodeError:
                 args = {}
 
+            print("TOOL ARGUMENTS", repr(args))
+            print("TOOL NAME:", repr(tool_call.function.name))
+            
              #log the ActionEvent to the event_log BEFORE the tool runs
             action_event = event_log.append(ActionEvent(
                 source = "agent",
@@ -64,7 +67,7 @@ def call_llm(client:OpenAI ,messages : list, available_functions : list, event_l
                 tool_name= tool_call.function.name,
                 tool_call_id= tool_call.id,
                 arguments= args
-            ), project_dir=DATA_DIR, session_id=SESSION_ID)
+            ), project_dir=DATA_DIR, session_id=session_id)
 
             try:
                 fn = available_functions[name]
@@ -88,6 +91,6 @@ def call_llm(client:OpenAI ,messages : list, available_functions : list, event_l
                 tool_call_id= tool_call.id,
                 tool_name=tool_call.function.name,
                 content= result
-            ), project_dir=DATA_DIR, session_id=SESSION_ID)
+            ), project_dir=DATA_DIR, session_id=session_id)
             messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
     raise RuntimeError(f"Agent hit {MAX_STEPS}-iteration limit")
