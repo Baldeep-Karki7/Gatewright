@@ -7,13 +7,15 @@ import openai
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from agent_config import DATA_DIR, EVENTS_PATH, LOG_PATH, SESSION_ID, SYSTEM
+from agent_config import DATA_DIR, LOG_PATH, SYSTEM
 from events.display import ConsoleDisplay
 from events.event_log import EventLog
 from events.replay import load_events, rebuild_messages
+from events.sessions import get_session, update_session_title
 from events.types import MessageEvent
 from events.utils import abort_turn
 from llm import call_llm
+from parseArgs import parse_args
 from utils import (
     change_report,
     edit_file,
@@ -35,8 +37,8 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 client = OpenAI(
-    base_url="https://ollama.com/v1",
-    api_key=os.environ["OLLAMA_API_KEY"],
+    base_url="https://api.groq.com/openai/v1",
+    api_key=os.environ["GROQ_API_KEY"],
     max_retries=4,
     timeout=120.0,
 )
@@ -49,16 +51,13 @@ available_functions = {
     "edit_file": edit_file,
 }
 
-event_log = EventLog(EVENTS_PATH)
-
-
-def run_turn(messages, start_id, checkpoint):
+def run_turn(messages, start_id, checkpoint, event_log, session_id):
     """Run the model on the current messages. On failure, undo the turn and record it."""
     before = snapshot()
     logger.info("CHANGES before = %s", before)
 
     try:
-        reply = call_llm(client, messages, available_functions, event_log=event_log)
+        reply = call_llm(client, messages, available_functions, event_log=event_log, session_id = session_id)
         messages.append({"role": "assistant", "content": reply})
         print(f"Assistant : {reply}")
 
@@ -86,44 +85,84 @@ def run_turn(messages, start_id, checkpoint):
             if report:
                 print(report)
 
-
-def last_user_event_id():
+def last_user_event_id(events_path):
     """Return the id of the most recent user message in the event file."""
-    for e in reversed(load_events(EVENTS_PATH)):
+    for e in reversed(load_events(path = events_path)):
         if e.type == "message" and e.source == "user":
             return e.id
     return None
 
+def run_agent(session_id, events_path):
+    # Initialize the event log for this session here.
+    # Adapt this to your EventLog constructor.
 
-if __name__ == "__main__":
-    if not initialize_git():
-        print("IMPORTANT : Git must be installed. Cannot observe file changes without git")
-        sys.exit(1)
+    event_log = EventLog(events_path)
 
-    # Rebuild the conversation from the event file, then start showing events.
-    messages = rebuild_messages(EVENTS_PATH, SYSTEM, event_log)
+    messages = rebuild_messages(
+        events_path,
+        SYSTEM,
+        event_log
+    )
+
     event_log.subscribe(ConsoleDisplay())
+
     messages = trim_messages(messages, max_messages=10)
 
-    # If the last turn was cut off, offer to continue it.
+    # Your existing interrupted-task recovery logic
     if messages[-1]["role"] in ("user", "tool"):
         print("The last turn was interrupted.")
+
         if input("Continue it? (y/n): ").lower() == "y":
-            start_id = last_user_event_id()
+            start_id = last_user_event_id(events_path)
+
             checkpoint = max(
-                (i for i, m in enumerate(messages) if m["role"] == "user"),
+                (i for i, m in enumerate(messages)
+                 if m["role"] == "user"),
                 default=len(messages),
             )
-            run_turn(messages, start_id, checkpoint)
 
+            run_turn(messages, start_id, checkpoint, event_log, session_id)
+
+    # Your existing conversation loop
     while True:
         try:
             user_input = input("User : ")
         except (EOFError, KeyboardInterrupt):
             break
 
-        user_event = event_log.append(MessageEvent(source="user", content=user_input), project_dir=DATA_DIR, session_id=SESSION_ID)
-        checkpoint = len(messages)
-        messages.append({"role": "user", "content": user_input})
+        if len(messages) == 1:
+            update_session_title(
+                DATA_DIR,
+                session_id=session_id,
+                user_message=user_input
+            )
 
-        run_turn(messages, user_event.id, checkpoint)
+        user_event = event_log.append(
+            MessageEvent(source="user", content=user_input),
+            project_dir=DATA_DIR,
+            session_id=session_id
+        )
+
+        checkpoint = len(messages)
+        messages.append({
+            "role": "user",
+            "content": user_input
+        })
+
+        run_turn(messages, user_event.id, checkpoint,event_log, session_id)
+
+
+if __name__ == "__main__":
+
+    args = parse_args()
+
+    if not initialize_git():
+        print("IMPORTANT: Git must be installed.")
+        sys.exit(1)
+
+    session_id, events_path = get_session(
+        args,
+        DATA_DIR
+    )
+
+    run_agent(session_id, events_path = events_path)
