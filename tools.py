@@ -20,7 +20,8 @@ LIST_TOOL = {
         "parameters" : {
             "type" : "object",
             "properties" : {},
-            "required" : []
+            "required" : [],
+            "additionalProperties": False
         }
     }
 }
@@ -33,7 +34,7 @@ WRITE_TOOL = {
             "parameters" : {
                 "type" : "object",
                 "properties" : {"file_name" :{"type" : "string"}, "text" : {"type" : "string"}},
-                "required" : ["flie_name", "text"]
+                "required" : ["file_name", "text"]
             }
         }
 }
