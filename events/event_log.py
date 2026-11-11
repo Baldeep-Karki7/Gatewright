@@ -1,6 +1,6 @@
 import logging
 
-from agent_config import EVENTS_PATH, update_session_metadata
+from events.sessions import update_session_metadata
 
 from .base import Event
 
@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 #events are appened to a jsonl using this class
 class EventLog:
-    def __init__(self, path = EVENTS_PATH):
+    def __init__(self, path):
         self.path = path
         self.events = []
         self.handlers = []
