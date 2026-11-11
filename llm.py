@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from uuid import uuid4
 
 from openai import OpenAI
@@ -13,12 +14,13 @@ from tools import EDIT_TOOL, LIST_TOOL, READ_TOOL, SHELL_TOOL, WRITE_TOOL
 logger = logging.getLogger(__name__)
 
 MAX_STEPS = 20
+MODEL_NAME = "openai/gpt-oss-20b"
 
 def call_llm(client:OpenAI ,messages : list, available_functions : list, event_log : EventLog) -> str:
 
     for _ in range(MAX_STEPS):
         response = client.chat.completions.create(
-                model="gemma4:31b",
+                model=MODEL_NAME,
                 messages=messages,
                 tools=[READ_TOOL, LIST_TOOL, WRITE_TOOL, SHELL_TOOL, EDIT_TOOL]
             )

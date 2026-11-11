@@ -18,7 +18,7 @@ LIST_TOOL = {
         "name" : "list_dir",
         "description" : "List all the files present in the workspace",
         "parameters" : {
-            "type" : "",
+            "type" : "object",
             "properties" : {},
             "required" : []
         }
