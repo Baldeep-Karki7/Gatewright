@@ -63,7 +63,8 @@ def close_unfinished(events, event_log):
 
     events = list(events)
     #each observation event has an action_id that refers to the action it observed after a tool is called
-
+    interrupted = []
+    
     for e in events:
         if e.type =="action" and e.id not in answered:
             #interrupted
@@ -80,7 +81,9 @@ def close_unfinished(events, event_log):
                     "Check the files before repeating it."
                 ),
             ))
-            events.append(note)
+            interrupted.append(note)
+    events.extend(interrupted)
+
     return events
 
 def build_messages(events):
