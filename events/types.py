@@ -1,4 +1,5 @@
 from typing import Any, Literal, Optional
+from pydantic import BaseModel
 
 from .base import Event
 
@@ -39,3 +40,15 @@ class TurnAbortedEvent(Event):
     error_type : str
     message : str
 
+class TodoItem(BaseModel):
+    id : str
+    content : str
+    status : Literal["pending", "in_progress", "completed", "cancelled"]
+
+
+class TodoEvent(Event):
+    """List of todoitems in the log"""
+    source : Literal["agent"] = "agent"
+    type : Literal["todo_update"] = "todo_update"
+    todos: list[TodoItem]
+    turn_start_id : str #the id of the user message tha started this turn
