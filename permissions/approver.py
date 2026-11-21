@@ -1,6 +1,7 @@
 #Ask the user wheter a tool call may run
-
 from dataclasses import dataclass
+from agent_config import INTERACTIVE
+
 
 @dataclass(frozen=True)
 class Answer:
@@ -42,3 +43,40 @@ class TerminalApprover:
         if reply.strip().lower() in ("y", "yes"):
             return Answer(True)
         return Answer(False, "user said no")
+
+
+class AutoYesApprover:
+    """Approves some or all 'ask' decisiuons without a terminal."""
+
+    #--yes (tools=None)
+    #--allow-shell(tools = {"run_shell"})
+
+    def __init__(self, tools=None):
+        self.tools = tools
+
+    def ask(self, tools, args, reason):
+        if self.tools is not None and tools not in self.tools:
+            return Answer(False, "not auto-approved")
+        return Answer(True, "auto-approved")
+
+class DenyApprover:
+    "Refuse every ask: no human is available in this run"
+
+    def ask(self, tools, args, reason):
+        return Answer(False, "no approval available (non-interactive)")
+
+
+def build_gate(args):
+    #Create permission gate for the run
+    from permissions.gate import Gate
+    from permissions.policy import Policy
+
+    if INTERACTIVE:
+        approver = TerminalApprover()
+    elif args.yes:
+        approver = AutoYesApprover()
+    elif args.allow_shell:
+        approver = AutoYesApprover(tools = {"run_shell"})
+    else:
+        approver = DenyApprover()
+    return Gate(Policy(mode = args.mode), approver)
