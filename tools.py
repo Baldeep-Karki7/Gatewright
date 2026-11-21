@@ -7,7 +7,8 @@ READ_TOOL = {
         "parameters" : {
             "type" : "object",
             "properties" : {"file_name" : {"type" : "string"}},
-            "required" : ["file_name"]
+            "required" : ["file_name"],
+            "additionalProperties":False
         }
     }
 }
@@ -19,8 +20,8 @@ LIST_TOOL = {
         "description" : "List all the files present in the workspace",
         "parameters" : {
             "type" : "object",
-            "properties" : {},
-            "required" : [],
+            "properties" : {"path" : {"type" : "string", "description": "Directory path relative to workspace (use \".\" for root)"}},
+            "required" : ["path"],
             "additionalProperties": False
         }
     }
@@ -34,7 +35,8 @@ WRITE_TOOL = {
             "parameters" : {
                 "type" : "object",
                 "properties" : {"file_name" :{"type" : "string"}, "text" : {"type" : "string"}},
-                "required" : ["file_name", "text"]
+                "required" : ["file_name", "text"],
+                "additionalProperties" : False
             }
         }
 }
@@ -43,17 +45,17 @@ SHELL_TOOL = {
     "type" : "function",
         "function" : {
             "name" : "run_shell",
-            "description" : "Run a shell command in workplace and return its output",
+            "description" : "Run a shell command in workspace and return its output",
             "parameters" : {
                 "type" : "object",
                 "properties" : {
                     "command" : {"type":"string"}
                 },
-                "required" : ["command"]
+                "required" : ["command"],
+                "additionalProperties" : False
             }
         }
 }
-
 
 EDIT_TOOL = {
     "type" : "function",
@@ -67,7 +69,42 @@ EDIT_TOOL = {
                     "old" : {"type":"string"},
                     "new" : {"type" : "string"}
                 },
-                "required" : ["file_name", "old", "new"]
+                "required" : ["file_name", "old", "new"],
+                "additionalProperties" : False
             }
         }
 }
+
+TODO_TOOL = {
+    "type" : "function",
+    "function" : {
+        "name" : "todo_write",
+        "description": (
+            "Plan and track multi-step work. Replaces the whole list each time, so "
+            "include every item. Keep exactly one item in_progress while work remains. "
+            "Mark an item completed only after the work and its check are done. "
+            "Do not use for a single trivial step."
+        ),
+        "parameters": {
+  "type": "object",
+  "properties": {
+    "todos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "content": {"type": "string"},
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "completed", "cancelled"]
+          }
+        },
+        "required": ["content", "status"],
+        "additionalProperties": False
+      }
+    }
+  },
+  "required": ["todos"],
+  "additionalProperties": False
+}
+}}
