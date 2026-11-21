@@ -1,4 +1,3 @@
-
 TOOL_PROFILES = {
     "readonly": {
         "read_file",
