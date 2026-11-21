@@ -57,7 +57,7 @@ def fallback(mode:str, tool:str)->tuple[str, str]:
 
     cat = category(tool)
 
-    #reading and upadtong the todo change nothing outside the agent
+    #reading and upadting the todo change nothing outside the agent
     if cat in ("read", "internal"):
         return "allow", f"{cat} tools are always allowed"
 
