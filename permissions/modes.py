@@ -51,7 +51,7 @@ def category(tool: str) -> str:
     return "other"
 
 
-def fallback(mode:str, tool)->tuple[str, str]:
+def fallback(mode:str, tool:str)->tuple[str, str]:
     #(action, reason) for a call that no rule matched
     #dont_ask turns every 'ask' into a denial 
 
