@@ -8,12 +8,13 @@ class ConsoleDisplay:
         # ActionEvent.id -> (tool_name, target)
         self.pending = {}
         self.VERBS = {
-                "read_file":  ("Reading", "Read"),
-                "write_file": ("Writing", "Wrote"),
-                "edit_file":  ("Editing", "Modified"),
-                "list_dir":   ("Listing", "Listed"),
-                "run_shell":  ("Running", "Ran"),
-            }
+            "read_file": ("Reading", "Read"),
+            "write_file": ("Writing", "Wrote"),
+            "edit_file": ("Editing", "Modified"),
+            "list_dir": ("Listing", "Listed"),
+            "run_shell": ("Running", "Ran"),
+            "todo_write": ("Updating todos", "Updated todos"),
+        }
 
     def _target(self, tool, args):
         if not isinstance(args, dict):
@@ -23,7 +24,7 @@ class ConsoleDisplay:
         if tool == "run_shell":
             return args.get("command", "")
         if tool == "list_dir":
-            return "workspace"
+            return args.get("path") or "workspace"
         return ""
 
     def __call__(self, event):
@@ -37,16 +38,25 @@ class ConsoleDisplay:
             entry = self.pending.pop(event.action_id, None)
             if entry is None:
                 logger.warning("observation %s has no matching action", event.action_id)
-                entry = ("tool", "")
-            tool, target = entry
+                entry = (getattr(event, "tool_name", "tool"), "")
 
+            tool, target = entry
             _, done = self.VERBS.get(tool, ("Calling", "Called"))
             text = str(event.content)
             failed = text.startswith("error") or (
-                tool == "run_shell" and not text.startswith("exit=0"))
+                tool == "run_shell" and not text.startswith("exit=0")
+            )
 
             if failed:
                 first = text.splitlines()[0][:100] if text else ""
                 print(f"  Failed: {tool} {target} ({first})")
+                return
+
+            if tool == "todo_write":
+                # Show the rendered todo list returned by TodoStore.write
+                for line in text.splitlines():
+                    print(f"  {line}")
             elif tool == "edit_file":
+                print(f"  {done} {target or tool}")
+            else:
                 print(f"  {done} {target or tool}")

@@ -16,15 +16,12 @@ logger = logging.getLogger(__name__)
 #     message : str
 
 
-def abort_turn(messages: list, checkpoint: int, start_id: str, event_log: EventLog, exc: Exception):
+def abort_turn(messages: list, checkpoint: int, start_id: str, event_log: EventLog, exc: Exception, project_dir, session_id):
     #delete the messages after the checkpoint
-    del messages[checkpoint:] 
+    del messages[checkpoint:]
 
-    try:
-        event_log.append(TurnAbortedEvent(
-            turn_start_id= start_id,
-            error_type= type(exc).__name__,
-            message= str(exc)[:500]
-        ))
-    except Exception:
-        logger.exception("Failed to log turn abort")
+    event_log.append(TurnAbortedEvent(
+        turn_start_id= start_id,
+        error_type= type(exc).__name__,
+        message= str(exc)[:500]
+    ), project_dir= project_dir, session_id=session_id )

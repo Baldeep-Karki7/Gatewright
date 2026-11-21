@@ -1,4 +1,5 @@
 from typing import Any, Literal, Optional
+
 from pydantic import BaseModel
 
 from .base import Event

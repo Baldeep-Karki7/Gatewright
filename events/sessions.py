@@ -7,7 +7,6 @@ from uuid import uuid4
 def create_session(project_dir):
 
     session_dir = os.path.join(project_dir, "sessions")
-
     os.makedirs(session_dir,mode=0o700 ,exist_ok=True)
 
     #sessions.json for storing all the sessions metadata
@@ -132,7 +131,10 @@ def select_session(sessions):
         print()
 
     while True:
-        choice = input("Select a session (number): ").strip()
+        try:
+            choice = input("Select a session (number): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return None
 
         try:
             index = int(choice) - 1
@@ -153,7 +155,7 @@ def resume_session(project_dir, session_id):
     return session_id, events_path
         
 
-def get_session(args, project_dir):
+def get_session(args, project_dir, interactive=True):
 
     sessions = list_sessions(project_dir)
 
@@ -179,7 +181,14 @@ def get_session(args, project_dir):
             return create_session(project_dir) #session_id, events.jsonl
 
         if args.resume == "interactive":
+            if not interactive:
+                raise ValueError(
+                    "--resume needs a session ID in non-interactive mode; "
+                    "use --continue or pass an ID"
+                )
             session_id = select_session(sessions)
+            if session_id is None:
+                return create_session(project_dir)
         else:
             session_id = args.resume
 

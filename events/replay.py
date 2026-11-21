@@ -5,11 +5,17 @@ from typing import Annotated, Union
 
 from pydantic import Field, TypeAdapter
 
-from .types import ActionEvent, MessageEvent, ObservationEvent, TurnAbortedEvent
+from .types import (
+    ActionEvent,
+    MessageEvent,
+    ObservationEvent,
+    TodoEvent,
+    TurnAbortedEvent,
+)
 
 #can be any of the 4 events, validated by field
 AnyEvent = Annotated[
-    Union[MessageEvent , ActionEvent , ObservationEvent , TurnAbortedEvent],
+    Union[MessageEvent, ActionEvent, ObservationEvent, TurnAbortedEvent, TodoEvent],
     Field(discriminator="type")
 ]
 
@@ -55,7 +61,7 @@ def drop_aborted(events):
     #return only the events whose i is not in remove set
     return [e for i,e in enumerate(events) if i not in remove]
 
-def close_unfinished(events, event_log):
+def close_unfinished(events, event_log, project_dir, session_id):
     """Give every tool call that has not result an 'interrupted' result"""
 
     #list the observation events recorded in the log
@@ -80,7 +86,7 @@ def close_unfinished(events, event_log):
                     "The command may or may not have run. "
                     "Check the files before repeating it."
                 ),
-            ))
+            ), project_dir, session_id)
             interrupted.append(note)
     events.extend(interrupted)
 
@@ -128,10 +134,10 @@ def build_messages(events):
 
     return messages
 
-def rebuild_messages(path, system_prompt, event_log):
+def rebuild_messages(path, system_prompt, event_log, project_dir, session_id):
     """Load the saved events and return the full message list with system prompt"""
 
     events = load_events(path)
     events = drop_aborted(events)
-    events = close_unfinished(events, event_log)
+    events = close_unfinished(events, event_log, project_dir, session_id)
     return [{"role" : "system", "content" : system_prompt}] + build_messages(events) 

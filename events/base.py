@@ -11,5 +11,5 @@ class Event(BaseModel):
 
     id : str = Field(default_factory=lambda : str(uuid4()))
     timestamp: str = 'Today'
-    type : Literal["message", "action", "observation","turn_aborted"]
+    type : Literal["message", "action", "observation","turn_aborted", "todo_update"]
     source : Literal["agent", "user", "environment"]
