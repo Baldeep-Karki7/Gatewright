@@ -27,7 +27,4 @@ DATA_DIR = data_dir(ROOT)
 
 LOG_PATH = os.path.join(DATA_DIR, 'agent.log')
 
-# True only when stdin is a terminal. Batch mode (pipe, CI, --prompt) never
-# calls input().
-INTERACTIVE = sys.stdin.isatty()
 
