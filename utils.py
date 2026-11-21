@@ -12,9 +12,9 @@ def safe_path(p):
         raise ValueError(f"path outside workspace {p}")
     return full
 
-
-def list_dir():
-    return '\n'.join(os.listdir())
+def list_dir(path):
+    full = safe_path(path.strip())
+    return '\n'.join(os.listdir(full))
 
 def write_file(file_name, text):
     with open(safe_path(file_name), 'w') as file:
@@ -43,51 +43,24 @@ def edit_file(file_name, old, new, multiple_replace = False):
             return f"error: old text not found ({hint}). Re-read the file and copy the lines exactly."
         old, new = old_s, new_s
 
-    if count > 1 and not multiple_replace:
-        return f"error : text matches {count} time. Include more surrounding texts so it matches exactly once"
-
+    if count > 1 and not multiple_replace: 
+        return f"error: text matches {count} time. Include more surrounding texts so it matches exactly once"
    
 
     with open(safe_path(file_name), 'w') as file:
         file.write(content.replace(old, new))
     return "ok"
     
-
 def run_shell(command):
-    print(f'\n Agent wants to run {command}')
-    if input("Allow ? (y/n)").lower() != "y":
-        return "error: user denied this command"
 
+    # The gate (permissions/gate.py) has already asked the user when needed.
     try:
-        r = subprocess.run(command, shell=True, capture_output=True, text=True,timeout=30, check=False) #doesnt cause exception
+        r = subprocess.run(command, shell=True, capture_output=True, text=True,
+                           timeout=30, check=False)
     except subprocess.TimeoutExpired:
         return "error: command timed out after 30s"
-    
+
     return f"exit={r.returncode}\nstdout:\n{r.stdout[:5000]}\nstderr:\n{r.stderr[:5000]}"
-
-
-# def save_history(messages):
-#     try:
-#         with open(safe_path(HISTORY), 'w') as fp:
-#             json.dump(messages, fp)
-#             print(f'HISTORY saved... to {HISTORY}')
-#     except Exception as e:
-#         logger.exception("Exception in opening history.json file")
-#         print(e)
-
-# def load_history():
-#     if os.path.exists(safe_path(HISTORY)):
-#         try:
-#             with open(safe_path(HISTORY), 'r', encoding='utf-8') as file:
-#                 history = json.load(file)
-#                 if history:
-#                     print(f'HISTORY LOADED.... from {HISTORY}\n')
-#                     return history
-#         except json.JSONDecodeError:
-#             #using logger.exception here causes traceback into the log but it is not needed
-#             logger.info('%s file decoding fail', HISTORY)
-
-#     return [{"role" : "system", "content" : SYSTEM}] 
 
 
 def trim_messages(messages, max_messages = 10):
