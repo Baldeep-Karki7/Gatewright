@@ -6,6 +6,12 @@ from agent_config import ROOT
 
 logger = logging.getLogger(__name__)
 
+
+READ_MAX_LINES = 2000
+READ_MAX_LINE_CHARS = 2000
+READ_MAX_CHARS = 60000
+
+
 def safe_path(p):
     full = os.path.realpath(os.path.join(ROOT, p))
     if full != ROOT and not full.startswith(ROOT + os.sep):
@@ -21,11 +27,23 @@ def write_file(file_name, text):
         file.write(text)
     return f"wrote the contents in the file {file_name}\n"
 
-def read_file(file_name):
-    with open(safe_path(file_name),'r') as file:
-        data = file.read()
-    return ''.join(data)
+def read_file(file_name, offset = 1, limit = READ_MAX_LINES):
+    #cap the tool output to 2000 lines and add a note that it was turncated
 
+    offset = max(1, int(offset))
+    limit = max(1, min(int(limit), READ_MAX_LINES))
+
+    with open(safe_path(file_name),'r') as file:
+        data = file.readlines()
+
+    total = len(lines)
+    if total == 0:
+        return "[empty file]"
+    if offset > total:
+        return f"error: offset {offset} is past the end of the file ({total}) lines"
+
+    out, size, cut_lines = [], 0, False
+    
 def edit_file(file_name, old, new, multiple_replace = False):
     with open(safe_path(file_name),'r') as file:
         content = file.read()
