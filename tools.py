@@ -3,10 +3,20 @@ READ_TOOL = {
     "type" : "function",
     "function" : {
         "name" : "read_file",
-        "description" : "Read a file in the workspace",
+        "description" : (
+            "Read a file in the workspace. Returns at most 2000 lines per call; "
+            "if the result ends with a [truncated: ...] note, call again with the "
+            "offset it gives to read the rest."
+        ),
         "parameters" : {
             "type" : "object",
-            "properties" : {"file_name" : {"type" : "string"}},
+            "properties" : {
+                "file_name" : {"type" : "string"},
+                "offset" : {"type" : "integer", "minimum": 1,
+                            "description": "1-based line to start from (default 1)"},
+                "limit" : {"type" : "integer", "minimum": 1, "maximum": 2000,
+                           "description": "Number of lines to return (default 2000)"},
+            },
             "required" : ["file_name"],
             "additionalProperties":False
         }
