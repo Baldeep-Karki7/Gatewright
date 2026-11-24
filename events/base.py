@@ -1,4 +1,5 @@
 # from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
@@ -10,6 +11,7 @@ class Event(BaseModel):
     model_config = {"frozen" : True}
 
     id : str = Field(default_factory=lambda : str(uuid4()))
-    timestamp: str = 'Today'
+    timestamp:  str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     type : Literal["message", "action", "observation","turn_aborted", "todo_update"]
     source : Literal["agent", "user", "environment"]
+    schema_version :int = 1
