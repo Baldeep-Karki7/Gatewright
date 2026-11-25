@@ -1,6 +1,8 @@
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 import sys
+import time
 import traceback
 
 import openai
@@ -10,7 +12,7 @@ from openai import OpenAI
 
 from log_context import set_session, set_turn, reset_turn, ContextFilter
 
-from agent_config import DATA_DIR, INTERACTIVE, LOG_PATH, SYSTEM
+from agent_config import DATA_DIR, INTERACTIVE, LOG_PATH, SYSTEM, LOG_BACKUPS, LOG_MAX_BYTES
 from events.display import ConsoleDisplay
 from events.event_log import EventLog
 from events.replay import drop_aborted, load_events, rebuild_messages
@@ -34,11 +36,21 @@ from utils import (
 )
 
 #create a handler for logs for more control
-handler = logging.FileHandler(LOG_PATH)
+handler = RotatingFileHandler(
+    LOG_PATH,
+    maxBytes= LOG_MAX_BYTES,
+    backupCount=LOG_BACKUPS,
+    encoding="utf-8"
+)
+
+
 handler.addFilter(ContextFilter()) #always returns True so all messages are passed and written
-handler.setFormatter(logging.Formatter(
-    "%(asctime)s %(levelname)s session=%(session)s turn=%(turn)s %(name)s %(message)s"
-))
+formatter = logging.Formatter(
+    "%(asctime)s.%(msecs)03dZ %(levelname)s session=%(session)s turn=%(turn)s %(name)s %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
+formatter.converter = time.gmtime  # UTC, same clock as the event log timestamps
+handler.setFormatter(formatter)
 
 logging.basicConfig(level=logging.INFO, handlers= [handler])
 
