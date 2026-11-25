@@ -27,7 +27,6 @@ from utils import (
     read_file,
     run_shell,
     snapshot,
-    trim_messages,
     write_file,
 )
 
@@ -222,7 +221,6 @@ def run_agent(session_id, events_path, project_dir, gate, tool_profile, one_shot
         note = resume_note(latest_todos(stored_events))
         messages[0] = {"role": "system", "content": SYSTEM + "\n\n" + note}
 
-    messages = trim_messages(messages, max_messages=10)
     event_log.subscribe(ConsoleDisplay())
 
     if resume_turn:

@@ -8,7 +8,8 @@ import openai
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from agent_config import DATA_DIR
+from context import fit_to_budget
+from agent_config import CONTEXT_BUDGET, DATA_DIR
 from events.event_log import EventLog
 from events.types import ActionEvent, MessageEvent, ObservationEvent
 from tool_profiles import TOOL_PROFILES
@@ -82,10 +83,22 @@ def call_llm(client: OpenAI, messages: list, available_functions: dict,
     selected_tools = get_tools_for_profile(tool_profile)
 
     for step in range(MAX_STEPS):
+
+        #calculate if inside budget
+        to_send, estimate = fit_to_budget(messages, selected_tools, CONTEXT_BUDGET)
+
+        if estimate > CONTEXT_BUDGET:
+            raise RequestTooLarge(
+                "context_length",
+                f"about {estimate} tokens after trimming; budget is {CONTEXT_BUDGET}"
+            )
+        
+        if len(to_send) < len(messages):
+            logger.info("TRIM sending %d of %d messages (~%d tokens)", len(to_send), len(messages), estimate)
         try:
             response = client.chat.completions.create(
                 model=MODEL_NAME,
-                messages=messages,
+                messages=to_send,
                 tools=selected_tools,
             )
         except openai.APIStatusError as exc:
@@ -118,7 +131,8 @@ def call_llm(client: OpenAI, messages: list, available_functions: dict,
             continue
 
         logger.info(
-            "MODEL call: prompt_tokens = %d completion_tokens = %d",
+            "MODEL call: estimated = %d prompt_tokens = %d completion_tokens = %d",
+            estimate, 
             response.usage.prompt_tokens,
             response.usage.completion_tokens,
         )
