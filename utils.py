@@ -2,14 +2,13 @@ import logging
 import os
 import subprocess
 
-from agent_config import ROOT
+from agent_config import ROOT, READ_MAX_CHARS  # READ_MAX_CHARS comes from .env
 
 logger = logging.getLogger(__name__)
 
+READ_MAX_LINES = 2000      # default lines returned per call
+READ_MAX_LINE_CHARS = 2000 # longer lines (minified files) are cut
 
-READ_MAX_LINES = 2000
-READ_MAX_LINE_CHARS = 2000
-READ_MAX_CHARS = 60000
 
 
 def safe_path(p):
@@ -27,22 +26,47 @@ def write_file(file_name, text):
         file.write(text)
     return f"wrote the contents in the file {file_name}\n"
 
-def read_file(file_name, offset = 1, limit = READ_MAX_LINES):
-    #cap the tool output to 2000 lines and add a note that it was turncated
+def read_file(file_name, offset=1, limit=READ_MAX_LINES):
+    """Return lines offset..offset+limit-1 (1-based), capped in size.
 
+    The text is returned exactly as stored (no line numbers) so it can be
+    copied straight into edit_file. A note at the end says when anything was
+    left out and how to read the rest.
+    """
     offset = max(1, int(offset))
     limit = max(1, min(int(limit), READ_MAX_LINES))
 
-    with open(safe_path(file_name),'r') as file:
-        data = file.readlines()
+    with open(safe_path(file_name), 'r') as file:
+        lines = file.readlines()
 
     total = len(lines)
     if total == 0:
         return "[empty file]"
     if offset > total:
-        return f"error: offset {offset} is past the end of the file ({total}) lines"
+        return f"error: offset {offset} is past the end of the file ({total} lines)"
 
     out, size, cut_lines = [], 0, False
+    end = offset - 1
+    for line in lines[offset - 1 : offset - 1 + limit]:
+        if len(line) > READ_MAX_LINE_CHARS:
+            line = line[:READ_MAX_LINE_CHARS] + " [line truncated]\n"
+            cut_lines = True
+        if size + len(line) > READ_MAX_CHARS:
+            break
+        out.append(line)
+        size += len(line)
+        end += 1
+
+    text = ''.join(out)
+    notes = []
+    if end < total:
+        notes.append(f"showing lines {offset}-{end} of {total}. "
+                     f"Call read_file again with offset={end + 1} to see more")
+    if cut_lines:
+        notes.append("some long lines were cut")
+    if notes:
+        text += f"\n[truncated: {'; '.join(notes)}]"
+    return text
     
 def edit_file(file_name, old, new, multiple_replace = False):
     with open(safe_path(file_name),'r') as file:
@@ -80,20 +104,6 @@ def run_shell(command):
 
     return f"exit={r.returncode}\nstdout:\n{r.stdout[:5000]}\nstderr:\n{r.stderr[:5000]}"
 
-
-def trim_messages(messages, max_messages = 10):
-    """ Trim the messages to the most recent 10 and make sure it starts with user message"""
-
-    if len(messages) <= max_messages:
-        return messages
-
-    #get the last 10
-    new_messages = messages[- max_messages:]
-
-    for i, m in enumerate(new_messages):
-        if m["role"] == "user":
-            return [messages[0]] + new_messages[i:]
-    return new_messages
 
 
 AGENT_FILES = ["agent.log", "events.jsonl", "history.json", ".agent/"]
