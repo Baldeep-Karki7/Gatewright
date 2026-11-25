@@ -1,4 +1,4 @@
-name : tests
+name: tests
 
 on:
   push:
@@ -10,19 +10,20 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.9", "3.12"]
-    
+
     env:
-      #tests never call the API
+      # Tests never call the API. Dummy values only satisfy the imports.
       GROQ_API_KEY: dummy-not-used
       GROQ_MODEL_NAME: dummy-model
-    
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
-          python-version: $({matrix.python-version})
+          python-version: ${{ matrix.python-version }}
           cache: pip
-      
-      -run: pip install -r requirements.txt -r requirements-dev.txt
 
-      -run python -m pytest -v
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - run: python -m pytest -v
