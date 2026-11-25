@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from typing import Any, Optional
 from uuid import uuid4
 
 import openai
@@ -22,6 +23,18 @@ MODEL_NAME = os.environ["GROQ_MODEL_NAME"]
 
 TOOLS = [READ_TOOL, LIST_TOOL, WRITE_TOOL, SHELL_TOOL, EDIT_TOOL, TODO_TOOL]
 
+
+class RequestTooLarge(Exception):
+    """when a request is too large for the model, it has to be made smaller first
+    
+    Retrying the same request is pointless, so this RequestTooLarge Exception is raised, instead of feeding the error back to the model
+    """
+
+    def __init__(self, kind, detail):
+        super().__init__(f"{kind} : {detail}")
+        self.kind = kind #rate_limit_tokens or context_length
+        self.detail = detail
+
 def get_tools_for_profile(profile):
     if profile not in TOOL_PROFILES:
         raise ValueError(f"Unknown tool profile: {profile}")
@@ -33,6 +46,28 @@ def get_tools_for_profile(profile):
         if tool["function"]["name"] in allowed
     ]
 
+
+def too_large_kind(exc):
+    """Why the request is too big or None if it'ssome other error"""
+
+    status = getattr(exc, "status_code", None)
+    code = getattr(exc, "code", None)
+    text = str(getattr(exc, "message", exc)).lower()
+
+    #413 : one:request is bigger thatn per-minute token limit (Groq)
+    if status == 413:
+       return "rate_limit_tokens"
+
+   #400: messages list doens't fit in the models' context window
+    if status == 400 and (
+        code == "context_length_exceeded"
+        or "context length" in text
+        or "maximum context" in text
+    ):
+       return "context_length"
+
+    return None
+   
 
 def call_llm(client: OpenAI, messages: list, available_functions: dict,
              event_log: EventLog, session_id: str, tool_profile:str, gate) -> str:
@@ -53,11 +88,23 @@ def call_llm(client: OpenAI, messages: list, available_functions: dict,
                 messages=messages,
                 tools=selected_tools,
             )
-        except openai.BadRequestError as exc:
+        except openai.APIStatusError as exc:
             # The whole completion was rejected, so there is no message to
             # append and no tool call to answer. Give the model the reason and
             # let it try again; MAX_STEPS bounds the retries.
             detail = getattr(exc, "message", str(exc))[:800]
+
+            #if req too large, retrying the same req can never work
+            kind = too_large_kind(exc)
+            if kind:
+                logger.warning("Request too large (%s, step %d): %s", kind, step, detail)
+                raise RequestTooLarge(kind, detail) from exc
+
+            #401, 429, 5xx: agent.py handles these:
+            if not isinstance(exc, openai.BadRequestError):
+                raise
+
+            #400 about the models' tool calls
             logger.warning("API rejected the request (step %d): %s", step, detail)
             messages.append({
                 "role": "user",

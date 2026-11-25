@@ -15,11 +15,10 @@ from events.sessions import get_session, update_session_title
 from events.todos import CANCELLED, TERMINAL, TodoStore, latest_todos, resume_note
 from events.types import MessageEvent
 from events.utils import abort_turn
-from llm import call_llm
+from llm import call_llm, RequestTooLarge
 from parseArgs import parse_args
 from permissions.approver import build_gate
 from permissions.gate import Gate
-from permissions.policy import Policy
 from utils import (
     change_report,
     edit_file,
@@ -105,7 +104,13 @@ def run_turn(messages, start_id, checkpoint, event_log,project_dir, session_id, 
                     "tell the user what is unverified."
                 ),
             })
-
+    except RequestTooLarge as e:
+        logger.warning("turn aborted, request too large: %s", e.kind)
+        if e.kind == "rate_limit_tokens":
+            print("This request is bigger thatn your provider's per-minute token limit", "so it cant be sent/ Aks about a smaller part of the file, lower HARNESS_READ_MAX_CHARS, or use a higher provider tier.")
+        else:
+            print("The conversation no longer fits in the model's context window. Start a new session or ask about a smaller part of the code")
+        abort_turn(messages, checkpoint, start_id, event_log, e, project_dir, session_id)
     except openai.AuthenticationError as e:
         logger.exception("Auth failed")
         print("API key rejected. Check Ollama API key")
@@ -169,7 +174,7 @@ def restore_system_prompt(messages, todo_store):
     if not todo_store.active and messages[0]["content"] != SYSTEM:
         messages[0] = {"role": "system", "content": SYSTEM}
 
-def run_agent(session_id, events_path, project_dir, gate, one_shot_prompt=None):
+def run_agent(session_id, events_path, project_dir, gate, tool_profile, one_shot_prompt=None,):
     # Initialize the event log for this session here.
     # Adapt this to your EventLog constructor.
 
@@ -180,8 +185,6 @@ def run_agent(session_id, events_path, project_dir, gate, one_shot_prompt=None):
     stored_events = drop_aborted(load_events(events_path))
     todo_store.load(stored_events)
     available_functions["todo_write"] = todo_store.write
-
-    tool_profile = "development"
 
     messages = rebuild_messages(
         events_path,
@@ -287,4 +290,4 @@ if __name__ == "__main__":
     #build the gate
     gate = build_gate(args)
 
-    run_agent(session_id, events_path=events_path, project_dir=DATA_DIR,one_shot_prompt=args.prompt, gate=gate)
+    run_agent(session_id, events_path=events_path, project_dir=DATA_DIR, tool_profile=args.profile, one_shot_prompt=args.prompt, gate=gate)
