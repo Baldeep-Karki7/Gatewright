@@ -1,15 +1,15 @@
 import json
 import logging
 import os
-from typing import Any, Optional
+import time
 from uuid import uuid4
 
 import openai
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from context import fit_to_budget
 from agent_config import CONTEXT_BUDGET, DATA_DIR
+from context import fit_to_budget
 from events.event_log import EventLog
 from events.types import ActionEvent, MessageEvent, ObservationEvent
 from tool_profiles import TOOL_PROFILES
@@ -155,6 +155,7 @@ def call_llm(client: OpenAI, messages: list, available_functions: dict,
         messages.append(msg.model_dump(exclude_none=True))
 
         for tool_call in msg.tool_calls:
+            started = time.monotonic()
             name = tool_call.function.name
             raw_args = tool_call.function.arguments
 
@@ -202,10 +203,12 @@ def call_llm(client: OpenAI, messages: list, available_functions: dict,
             ok = not result.startswith("error")
             if name == "run_shell":
                 ok = ok and result.startswith("exit=0")
-            logger.info(
-                "TOOL = %s args = %s ok = %s result = %s",
-                name, args, ok, result[:300],
-            )
+            # logger.info(
+            #     "TOOL = %s args = %s ok = %s result = %s",
+            #     name, args, ok, result[:300],
+            # )
+
+            logger.info("TOOL name=%s call_id=%s ok=%s result_chars=%s ms=%d", name, tool_call.id, ok, len(result), (time.monotonic() - started)* 1000)
 
             # Every tool_call must get a matching tool result message.
             event_log.append(ObservationEvent(
