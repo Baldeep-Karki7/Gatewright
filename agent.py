@@ -7,6 +7,9 @@ import openai
 from dotenv import load_dotenv
 from openai import OpenAI
 
+
+from log_context import set_session, set_turn, reset_turn, ContextFilter
+
 from agent_config import DATA_DIR, INTERACTIVE, LOG_PATH, SYSTEM
 from events.display import ConsoleDisplay
 from events.event_log import EventLog
@@ -30,11 +33,15 @@ from utils import (
     write_file,
 )
 
-logging.basicConfig(
-    filename=LOG_PATH,
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
-)
+#create a handler for logs for more control
+handler = logging.FileHandler(LOG_PATH)
+handler.addFilter(ContextFilter()) #always returns True so all messages are passed and written
+handler.setFormatter(logging.Formatter(
+    "%(asctime)s %(levelname)s session=%(session)s turn=%(turn)s %(name)s %(message)s"
+))
+
+logging.basicConfig(level=logging.INFO, handlers= [handler])
+
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -65,6 +72,8 @@ def plan_state(todo_store):
 
 def run_turn(messages, start_id, checkpoint, event_log,project_dir, session_id, todo_store, tool_profile, gate: Gate):
     """Run the model on the current messages. On failure, undo the turn and record it."""
+
+    turn_token = set_turn(start_id)
     before = snapshot()
     logger.info("CHANGES before = %s", before)
     plan_before = plan_state(todo_store)
@@ -133,6 +142,7 @@ def run_turn(messages, start_id, checkpoint, event_log,project_dir, session_id, 
             report = change_report(before, after)
             if report:
                 print(report)
+        reset_turn(turn_token) #reset the turn
 
 def last_user_event_id(events_path):
     """Return the id of the most recent user message in the event file."""
@@ -284,6 +294,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
     session_id, events_path = get_session(args, DATA_DIR, interactive=INTERACTIVE)
+
+    set_session(session_id= session_id)
 
     #build the gate
     gate = build_gate(args)
