@@ -53,4 +53,11 @@ READ_MAX_CHARS = env_int("HARNESS_READ_MAX_CHARS", 16000, 1000)
 #2000 for system promopt overhead
 CONTEXT_BUDGET = env_int("HARNESS_CONTEXT_BUDGET", 6000, minimum=2000)
 
+#for rotating file handler, maxBytes for each file
+LOG_MAX_BYTES = env_int("HARNESS_LOG_MAX_BYTES", 5 * 1024 * 1024, minimum = 10 * 1024)
+
+#minimum 1 backup, maximum 3 backups
+LOG_BACKUPS = env_int("HARNESS_LOG_BACKUPS", 3, minimum=1)
+
+
 
