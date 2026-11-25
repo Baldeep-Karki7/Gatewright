@@ -18,7 +18,7 @@ def test_shell_cannot_see_api_keys(monkeypatch):
 
 def test_normal_command_still_work():
     #Arrange
-    commands = ["git --version", "cat fixes.txt", "ls"]
+    commands = ["git --version", "python3 --version", "ls"]
     
     #Act
     for command in commands:
