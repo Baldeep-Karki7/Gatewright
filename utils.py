@@ -92,13 +92,22 @@ def edit_file(file_name, old, new, multiple_replace = False):
     with open(safe_path(file_name), 'w') as file:
         file.write(content.replace(old, new))
     return "ok"
-    
+
+#The only environment variables shell command get. Everything else including API kets loaded from the .env is left out
+SHELL_ENV_KEYS = ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TERM", "TMPDIR", "SHELL")
+
+def shell_env():
+    """A minimal environment for run_shell"""
+    env = {k:os.environ[k] for k in SHELL_ENV_KEYS if k in os.environ}
+    env.setdefault("PATH", "/usr/bin:/bin:/usr/sbin:/sbin")
+    return env
+
 def run_shell(command):
 
     # The gate (permissions/gate.py) has already asked the user when needed.
     try:
         r = subprocess.run(command, shell=True, capture_output=True, text=True,
-                           timeout=30, check=False)
+                           timeout=30, check=False,env= shell_env())
     except subprocess.TimeoutExpired:
         return "error: command timed out after 30s"
 
