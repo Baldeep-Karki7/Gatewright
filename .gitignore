@@ -18,6 +18,7 @@ agent.log
 *.env
 events.jsonl
 
-*.txt
+fixes.txt
+status.txt
 # agent files
 .agent/
