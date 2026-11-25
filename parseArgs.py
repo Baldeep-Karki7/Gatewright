@@ -1,5 +1,6 @@
 import argparse
 from permissions.modes import MODES
+from tool_profiles import TOOL_PROFILES
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Coding agent harness")
@@ -31,6 +32,11 @@ def parse_args():
     parser.add_argument(
         "--mode", choices=MODES, default="accept_edits",
         help="Permission mode (default: accept_edits)"
+    )
+
+    parser.add_argument(
+        "--profile", choices =sorted(TOOL_PROFILES),
+        default="development", help = "which tools the model is offered (default: development)"
     )
 
     return parser.parse_args()
